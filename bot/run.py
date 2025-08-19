@@ -50,7 +50,7 @@ def cmd_paper(args):
         "sma_crossover": SMACrossoverStrategy(fast=args.fast, slow=args.slow),
         "rsi": RSIStrategy(rsi_period=args.rsi_period, rsi_oversold=args.rsi_oversold, rsi_overbought=args.rsi_overbought),
     }
-    strategy = strategy_map.get(.strategy)
+    strategy = strategy_map.get(args.strategy)
     if not strategy:
         print(f"Invalid strategy: {args.strategy}")
         return
@@ -119,4 +119,17 @@ def main(argv=None):
     sp.add_argument("--quote", type=str, default="USDT")
     sp.add_argument("--timeframe", type=str, default="1m")
     sp.add_argument("--strategy", type=str, default="sma_crossover", choices=["sma_crossover", "rsi"], help="Trading strategy to use")
-    sp.add_argument("--
+    sp.add_argument("--fast", type=int, default=10, help="Fast SMA period")
+    sp.add_argument("--slow", type=int, default=30, help="Slow SMA period")
+    sp.add_argument("--rsi-period", type=int, default=14)
+    sp.add_argument("--rsi-oversold", type=int, default=30)
+    sp.add_argument("--rsi-overbought", type=int, default=70)
+    sp.add_argument("--cash", type=float, default=100.0, help="Cash to deploy per trade")
+    sp.add_argument("--stop-loss", type=float, default=0.05, help="Stop-loss percentage (e.g., 0.05 for 5%)")
+    sp.add_argument("--take-profit", type=float, default=0.1, help="Take-profit percentage (e.g., 0.1 for 10%)")
+    sp.add_argument("--sleep", type=int, default=60, help="Seconds between loops")
+    sp.set_defaults(func=cmd_paper)
+
+    # Live command
+    sp = sub.add_parser("live", help="(DANGER) Live trading loop (market orders). Use at your own risk.")
+    sp.add_argument("--symbol", type=str, required=
