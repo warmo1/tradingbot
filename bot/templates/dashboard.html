@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
 <head>
-  <meta charset="utf-g">
+  <meta charset="utf-8">
   <title>Crypto Bot Dashboard</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
@@ -31,6 +31,36 @@
     <div class="card"><div>Realised P&L</div><div><strong>£{{ total_realized }}</strong></div></div>
     <div class="card"><div>Equity</div><div><strong>£{{ equity }}</strong></div></div>
   </div>
+
+  <div class="cards">
+    <div class="card" style="grid-column: 1 / -1;">
+      <h2 style="margin-top:0">Insight</h2>
+      {% if latest_insight %}
+        <div class="muted">{{ latest_insight.created }} · analysed: {{ latest_insight.count }}</div>
+        <h3 style="margin:0.5rem 0">{{ latest_insight.headline }}</h3>
+        <p style="white-space:pre-wrap; margin:0">{{ latest_insight.summary }}</p>
+      {% else %}
+        <div class="muted">No insights yet. Run <code>python -m bot.run news</code> then <code>python -m bot.run insights</code>.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <h2>Latest News</h2>
+  <table>
+    <thead><tr><th>Title</th><th>Published</th></tr></thead>
+    <tbody>
+      {% if news_items %}
+        {% for n in news_items %}
+          <tr>
+            <td><a href="{{ n.url }}" target="_blank" rel="noopener noreferrer">{{ n.title }}</a></td>
+            <td class="muted">{{ n.published }}</td>
+          </tr>
+        {% endfor %}
+      {% else %}
+        <tr><td colspan="2" class="muted">No news cached. Run <code>python -m bot.run news</code>.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
 
   <h2>Trading Signals (1h SMA)</h2>
   <table>
