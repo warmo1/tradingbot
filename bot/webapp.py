@@ -1,51 +1,14 @@
-from flask import Flask, render_template, jsonify, request
-import os
-import json
+from flask import Flask, render_template, jsonify, request, redirect, url_for
 from .config import cfg
-from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_symbols, get_candles_df
+from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_symbols, get_candles_df, paper_trade, paper_set
 from .strategy import SMACrossoverStrategy
-from .gemini_analyzer import get_gemini_trade_suggestion
+from .ai_analyzer import get_ai_analyzer
+from .news import get_latest_crypto_news
+import time
 
 app = Flask(__name__)
 
-# ---- Insights & News helpers (file-based, no extra deps) ----
-BASE_DIR = os.path.dirname(__file__)
-INSIGHTS_PATH = os.path.join(BASE_DIR, "insights_latest.json")
-NEWS_CACHE_PATH = os.path.join(BASE_DIR, "news_cache.json")
-
-def _load_json(path):
-    try:
-        if not os.path.exists(path):
-            return None
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return None
-
-def _get_latest_insight():
-    data = _load_json(INSIGHTS_PATH)
-    if isinstance(data, dict):
-        return {
-            "headline": data.get("headline", "Insight"),
-            "summary": data.get("summary", ""),
-            "created": data.get("created") or data.get("created_ts") or "",
-            "count": data.get("count") or data.get("items") or "",
-        }
-    return None
-
-def _get_latest_news(limit=10):
-    data = _load_json(NEWS_CACHE_PATH)
-    if isinstance(data, list):
-        out = []
-        for it in data[:limit]:
-            out.append({
-                "title": (it.get("title") or "").strip(),
-                "url": (it.get("url") or "").strip(),
-                "published": (it.get("published") or "").strip(),
-            })
-        return out
-    return []
-
+# (Keep the existing _get_non_gemini_suggestions and _compute_summary functions)
 def _get_non_gemini_suggestions(conn):
     """Generates a list of BUY/SELL/HOLD signals from the SMA strategy."""
     symbols = get_symbols(conn, cfg.exchange, quote=cfg.default_quote)
@@ -111,7 +74,7 @@ def _compute_summary():
     realized_rows = [
         dict(symbol=sym, realized_pnl=round(val, 2))
         for sym, val in sorted(realized.items(), key=lambda kv: kv[1], reverse=True)
-    ] if realized else [] # <-- THIS LINE WAS THE SOURCE OF THE ERROR (missing [])
+    ] if realized else []
 
     position_rows = []
     for sym, qty in positions.items():
@@ -135,10 +98,11 @@ def _compute_summary():
             ))
     
     suggestions = _get_non_gemini_suggestions(conn)
-
-    # Load latest insight + recent news (file-based)
-    latest_insight = _get_latest_insight()
-    news_items = _get_latest_news(limit=10)
+    
+    # --- New News and Insights ---
+    headlines = get_latest_crypto_news()
+    ai_analyzer = get_ai_analyzer() # Defaults to Gemini
+    news_sentiment = ai_analyzer.get_news_sentiment(headlines) if headlines else "Could not fetch news."
 
     return dict(
         cash=round(cash, 2),
@@ -149,15 +113,17 @@ def _compute_summary():
         position_rows=position_rows,
         recent_trades=recent_trades,
         suggestions=suggestions,
-        latest_insight=latest_insight,
-        news_items=news_items,
+        headlines=headlines,
+        news_sentiment=news_sentiment
     )
+
 
 @app.route("/")
 def dashboard():
     data = _compute_summary()
     return render_template("dashboard.html", **data)
 
+# (Keep the existing /trades and /api/gemini-suggestion routes)
 @app.route("/trades")
 def trades():
     data = _compute_summary()
@@ -175,8 +141,39 @@ def gemini_suggestion():
     if df.empty:
         return jsonify({"error": f"No data found for {symbol} on {timeframe} timeframe."}), 404
     
-    suggestion = get_gemini_trade_suggestion(symbol, df)
+    ai_analyzer = get_ai_analyzer() # Defaults to Gemini
+    suggestion = ai_analyzer.get_trade_suggestion(symbol, df)
     return jsonify({"suggestion": suggestion})
+
+
+# --- New Route for Dashboard Trading ---
+@app.route("/trade/buy", methods=["POST"])
+def buy_from_dashboard():
+    symbol = request.form['symbol']
+    cash_per_trade = 100.0 # You can make this configurable
+    
+    conn = get_conn(cfg.database_url)
+    price = get_latest_close(conn, cfg.exchange, symbol)
+    if not price:
+        return "Could not get latest price.", 400
+
+    cash = float(paper_get(conn, "cash", "0"))
+    if cash < cash_per_trade:
+        return "Not enough cash.", 400
+
+    qty = cash_per_trade / price
+    new_cash = cash - cash_per_trade
+    
+    pos_key = f"pos:{symbol}"
+    current_qty = float(paper_get(conn, pos_key, "0"))
+    new_qty = current_qty + qty
+
+    paper_set(conn, "cash", str(new_cash))
+    paper_set(conn, pos_key, str(new_qty))
+    paper_trade(conn, int(time.time() * 1000), symbol, "buy", qty, price, note="Dashboard BUY")
+
+    return redirect(url_for("dashboard"))
+
 
 def create_app():
     return app
