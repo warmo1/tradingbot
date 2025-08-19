@@ -1,10 +1,50 @@
 from flask import Flask, render_template, jsonify, request
+import os
+import json
 from .config import cfg
 from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_symbols, get_candles_df
 from .strategy import SMACrossoverStrategy
 from .gemini_analyzer import get_gemini_trade_suggestion
 
 app = Flask(__name__)
+
+# ---- Insights & News helpers (file-based, no extra deps) ----
+BASE_DIR = os.path.dirname(__file__)
+INSIGHTS_PATH = os.path.join(BASE_DIR, "insights_latest.json")
+NEWS_CACHE_PATH = os.path.join(BASE_DIR, "news_cache.json")
+
+def _load_json(path):
+    try:
+        if not os.path.exists(path):
+            return None
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+def _get_latest_insight():
+    data = _load_json(INSIGHTS_PATH)
+    if isinstance(data, dict):
+        return {
+            "headline": data.get("headline", "Insight"),
+            "summary": data.get("summary", ""),
+            "created": data.get("created") or data.get("created_ts") or "",
+            "count": data.get("count") or data.get("items") or "",
+        }
+    return None
+
+def _get_latest_news(limit=10):
+    data = _load_json(NEWS_CACHE_PATH)
+    if isinstance(data, list):
+        out = []
+        for it in data[:limit]:
+            out.append({
+                "title": (it.get("title") or "").strip(),
+                "url": (it.get("url") or "").strip(),
+                "published": (it.get("published") or "").strip(),
+            })
+        return out
+    return []
 
 def _get_non_gemini_suggestions(conn):
     """Generates a list of BUY/SELL/HOLD signals from the SMA strategy."""
@@ -96,6 +136,10 @@ def _compute_summary():
     
     suggestions = _get_non_gemini_suggestions(conn)
 
+    # Load latest insight + recent news (file-based)
+    latest_insight = _get_latest_insight()
+    news_items = _get_latest_news(limit=10)
+
     return dict(
         cash=round(cash, 2),
         equity=round(equity, 2),
@@ -104,7 +148,9 @@ def _compute_summary():
         realized_rows=realized_rows,
         position_rows=position_rows,
         recent_trades=recent_trades,
-        suggestions=suggestions
+        suggestions=suggestions,
+        latest_insight=latest_insight,
+        news_items=news_items,
     )
 
 @app.route("/")
