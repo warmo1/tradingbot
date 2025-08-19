@@ -15,6 +15,7 @@
     .nav a { margin-right: 1rem; text-decoration: none; color: #0366d6; }
     .muted { color: #666; }
     .gemini-btn { background-color: #4285F4; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+    .buy-btn { background-color: #0F9D58; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -32,39 +33,21 @@
     <div class="card"><div>Equity</div><div><strong>£{{ equity }}</strong></div></div>
   </div>
 
-  <div class="cards">
-    <div class="card" style="grid-column: 1 / -1;">
-      <h2 style="margin-top:0">Insight</h2>
-      {% if latest_insight %}
-        <div class="muted">{{ latest_insight.created }} · analysed: {{ latest_insight.count }}</div>
-        <h3 style="margin:0.5rem 0">{{ latest_insight.headline }}</h3>
-        <p style="white-space:pre-wrap; margin:0">{{ latest_insight.summary }}</p>
-      {% else %}
-        <div class="muted">No insights yet. Run <code>python -m bot.run news</code> then <code>python -m bot.run insights</code>.</div>
-      {% endif %}
-    </div>
+  <h2>Latest News & AI Sentiment</h2>
+  <div class="card">
+    <h4>Headlines:</h4>
+    <ul>
+      {% for headline in headlines %}
+        <li>{{ headline }}</li>
+      {% endfor %}
+    </ul>
+    <h4>AI Sentiment Analysis:</h4>
+    <p>{{ news_sentiment }}</p>
   </div>
-
-  <h2>Latest News</h2>
-  <table>
-    <thead><tr><th>Title</th><th>Published</th></tr></thead>
-    <tbody>
-      {% if news_items %}
-        {% for n in news_items %}
-          <tr>
-            <td><a href="{{ n.url }}" target="_blank" rel="noopener noreferrer">{{ n.title }}</a></td>
-            <td class="muted">{{ n.published }}</td>
-          </tr>
-        {% endfor %}
-      {% else %}
-        <tr><td colspan="2" class="muted">No news cached. Run <code>python -m bot.run news</code>.</td></tr>
-      {% endif %}
-    </tbody>
-  </table>
 
   <h2>Trading Signals (1h SMA)</h2>
   <table>
-    <thead><tr><th>Symbol</th><th>Signal</th><th>Gemini Analysis</th></tr></thead>
+    <thead><tr><th>Symbol</th><th>Signal</th><th>Gemini Analysis</th><th>Action</th></tr></thead>
     <tbody>
       {% if suggestions %}
         {% for s in suggestions %}
@@ -72,10 +55,16 @@
           <td>{{ s.symbol }}</td>
           <td>{{ s.signal }}</td>
           <td><button class="gemini-btn" onclick="getGeminiSuggestion('{{ s.symbol }}')">Ask Gemini</button></td>
+          <td>
+            <form action="/trade/buy" method="post" style="display:inline;">
+              <input type="hidden" name="symbol" value="{{ s.symbol }}">
+              <button type="submit" class="buy-btn">Paper Buy</button>
+            </form>
+          </td>
         </tr>
         {% endfor %}
       {% else %}
-      <tr><td colspan="3" class="muted">No strong signals right now.</td></tr>
+      <tr><td colspan="4" class="muted">No strong signals right now.</td></tr>
       {% endif %}
     </tbody>
   </table>
@@ -108,22 +97,22 @@
     </tbody>
   </table>
 
+
   <script>
     function getGeminiSuggestion(symbol) {
-      alert(`Asking Gemini for an analysis of ${symbol}. This may take a moment...`);
+      alert(`Asking AI for an analysis of ${symbol}. This may take a moment...`);
       fetch(`/api/gemini-suggestion?symbol=${symbol}`)
         .then(response => response.json())
         .then(data => {
           if (data.error) {
             alert(`Error: ${data.error}`);
           } else {
-            // Use a more pleasant way to display the result, like a modal, in a real app
-            alert(`--- Gemini Suggestion for ${symbol} ---\n\n${data.suggestion}`);
+            alert(`--- AI Suggestion for ${symbol} ---\n\n${data.suggestion}`);
           }
         })
         .catch(error => {
-          console.error('Error fetching Gemini suggestion:', error);
-          alert('An error occurred while contacting the Gemini API.');
+          console.error('Error fetching suggestion:', error);
+          alert('An error occurred while contacting the AI API.');
         });
     }
   </script>
