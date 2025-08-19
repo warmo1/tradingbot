@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Crypto Bot Dashboard</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
+    h1 { margin-bottom: 0.25rem; }
+    .cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin: 1rem 0; }
+    .card { border: 1px solid #e1e1e1; border-radius: 12px; padding: 1rem; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
+    th, td { border-bottom: 1px solid #eee; padding: 0.5rem; text-align: left; }
+    th { background: #fafafa; }
+    .nav { margin-bottom: 1rem; }
+    .nav a { margin-right: 1rem; text-decoration: none; color: #0366d6; }
+    .muted { color: #666; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/">Dashboard</a>
+    <a href="/trades">Trades</a>
+  </div>
+  <h1>Dashboard</h1>
+  <p class="muted">Paper-trading summary from your SQLite DB.</p>
+
+  <div class="cards">
+    <div class="card"><div>Cash</div><div><strong>£{{ cash }}</strong></div></div>
+    <div class="card"><div>Open P&L (MTM)</div><div><strong>£{{ total_mtm }}</strong></div></div>
+    <div class="card"><div>Realised P&L</div><div><strong>£{{ total_realized }}</strong></div></div>
+    <div class="card"><div>Equity</div><div><strong>£{{ equity }}</strong></div></div>
+  </div>
+
+  <h2>Open Positions</h2>
+  <table>
+    <thead><tr><th>Symbol</th><th>Qty</th><th>Last Price</th><th>Value</th></tr></thead>
+    <tbody>
+      {% if position_rows %}
+        {% for r in position_rows %}
+        <tr><td>{{ r.symbol }}</td><td>{{ "%.6f"|format(r.qty) }}</td><td>{{ r.last_price or "-" }}</td><td>£{{ r.value }}</td></tr>
+        {% endfor %}
+      {% else %}
+      <tr><td colspan="4" class="muted">No open positions.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <h2>Realised P&L by Symbol</h2>
+  <table>
+    <thead><tr><th>Symbol</th><th>Realised P&L</th></tr></thead>
+    <tbody>
+      {% if realized_rows %}
+        {% for r in realized_rows %}
+        <tr><td>{{ r.symbol }}</td><td>£{{ r.realized_pnl }}</td></tr>
+        {% endfor %}
+      {% else %}
+      <tr><td colspan="2" class="muted">No realised P&L yet.</td></tr>
+      {% endif %}
+    </tbody>
+  </table>
+</body>
+</html>
