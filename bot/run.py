@@ -1,13 +1,15 @@
 import argparse
 from .config import cfg
-from .db import get_conn, init_schema
+from .db import get_conn, init_schema, get_candles_df
 from .discover import discover_markets
 from .data import ingest_candles
 from .backtest import run_backtest
 from .paper import paper_loop
 from .exchange import get_exchange
 from .strategy import SMACrossoverStrategy, RSIStrategy
-from .gemini_analyzer import get_gemini_sentiment
+from .gemini_analyzer import get_gemini_sentiment, get_gemini_trade_suggestion
+
+# (Keep all the existing cmd_ functions like cmd_discover, cmd_ingest, etc.)
 
 def cmd_discover(args):
     conn = get_conn(cfg.database_url)
@@ -87,10 +89,22 @@ def cmd_gemini(args):
     print("--- Gemini Sentiment Analysis ---")
     print(sentiment)
 
+def cmd_gemini_trade(args):
+    conn = get_conn(cfg.database_url)
+    df = get_candles_df(conn, cfg.exchange, args.symbol, args.timeframe)
+    if df.empty:
+        print(f"No data found for {args.symbol} on {args.timeframe} timeframe. Ingest data first.")
+        return
+    print(f"Analyzing {args.symbol} on the {args.timeframe} timeframe...")
+    suggestion = get_gemini_trade_suggestion(args.symbol, df)
+    print("\n--- Gemini Trade Suggestion ---")
+    print(suggestion)
+
 def main(argv=None):
     p = argparse.ArgumentParser(description="Crypto Bot (Starter)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    # (Keep all the existing parsers: discover, ingest, backtest, paper, live, gemini)
     # Discover command
     sp = sub.add_parser("discover", help="Discover and store markets (symbols)")
     sp.add_argument("--quote", type=str, default=None, help="Filter by quote currency (e.g., USDT)")
@@ -144,6 +158,12 @@ def main(argv=None):
     # Gemini command
     sp = sub.add_parser("gemini", help="Run Gemini sentiment analysis")
     sp.set_defaults(func=cmd_gemini)
+
+    # NEW Gemini Trade command
+    sp = sub.add_parser("gemini-trade", help="Get a trade suggestion from Gemini based on market data")
+    sp.add_argument("--symbol", type=str, required=True, help="Symbol to analyze, e.g., BTC/USDT")
+    sp.add_argument("--timeframe", type=str, default="1h", help="Timeframe to analyze, e.g., 1h, 15m, 1d")
+    sp.set_defaults(func=cmd_gemini_trade)
 
     args = p.parse_args(argv)
     return args.func(args)
