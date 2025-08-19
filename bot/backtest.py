@@ -3,7 +3,7 @@ import pandas as pd
 from typing import Tuple, List
 from .db import get_conn, get_candles_df, get_symbols
 from .config import cfg
-from .strategy import sma_crossover, position_changes
+from .strategy import SMACrossoverStrategy, position_changes
 
 @dataclass
 class BTResult:
@@ -18,11 +18,16 @@ def run_backtest(database_url: str, timeframe: str="1h", fast: int=20, slow: int
     symbols = get_symbols(conn, cfg.exchange, quote=quote)
     results: List[BTResult] = []
 
+    # Initialize the strategy object
+    strategy = SMACrossoverStrategy(fast=fast, slow=slow)
+
     for symbol in symbols[: (top or len(symbols)) ]:
         df = get_candles_df(conn, cfg.exchange, symbol, timeframe)
         if df.empty or len(df) < max(fast, slow) + 2:
             continue
-        sig = sma_crossover(df, fast=fast, slow=slow)
+
+        # Use the strategy object to generate signals
+        sig = strategy.generate_signals(df)
         changes = position_changes(sig)
         df["ret"] = df["close"].pct_change().fillna(0)
         pos = sig.shift(1).fillna(0)  # hold prior bar's signal
