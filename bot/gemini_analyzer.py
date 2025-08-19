@@ -10,7 +10,8 @@ def get_gemini_sentiment(headlines: list[str]) -> str:
         raise ValueError("GEMINI_API_KEY not set in .env file.")
 
     genai.configure(api_key=cfg.gemini_api_key)
-    model = genai.GenerativeModel('gemini-pro')
+    # Use the official 2.5 Pro model name
+    model = genai.GenerativeModel('gemini-2.5-pro')
 
     prompt = f"""
     Analyze the sentiment of the following cryptocurrency news headlines and classify it as 'bullish', 'bearish', or 'neutral'.
@@ -34,7 +35,8 @@ def get_gemini_trade_suggestion(symbol: str, df: pd.DataFrame) -> str:
         raise ValueError("GEMINI_API_KEY not set in .env file.")
 
     genai.configure(api_key=cfg.gemini_api_key)
-    model = genai.GenerativeModel('gemini-pro')
+    # Use the official 2.5 Pro model name
+    model = genai.GenerativeModel('gemini-2.5-pro')
 
     # Prepare the data for the prompt
     df_recent = df.tail(50) # Use the last 50 candles
