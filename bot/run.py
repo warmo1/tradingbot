@@ -132,4 +132,21 @@ def main(argv=None):
 
     # Live command
     sp = sub.add_parser("live", help="(DANGER) Live trading loop (market orders). Use at your own risk.")
-    sp.add_argument("--symbol", type=str, required=
+    sp.add_argument("--symbol", type=str, required=True, help="Symbol like BTC/USDT")
+    sp.add_argument("--timeframe", type=str, default="1m")
+    sp.add_argument("--fast", type=int, default=10)
+    sp.add_argument("--slow", type=int, default=30)
+    sp.add_argument("--cash", type=float, default=50.0, help="Approx quote to deploy per trade")
+    sp.add_argument("--sleep", type=int, default=60)
+    sp.add_argument("--confirm", type=str, default="", help="Must equal 'TRADE' to run")
+    sp.set_defaults(func=cmd_live)
+
+    # Gemini command
+    sp = sub.add_parser("gemini", help="Run Gemini sentiment analysis")
+    sp.set_defaults(func=cmd_gemini)
+
+    args = p.parse_args(argv)
+    return args.func(args)
+
+if __name__ == "__main__":
+    main()
