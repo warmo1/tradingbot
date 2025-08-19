@@ -1,8 +1,33 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify, request
 from .config import cfg
-from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get
+from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_symbols, get_candles_df
+from .strategy import SMACrossoverStrategy
+from .gemini_analyzer import get_gemini_trade_suggestion
 
 app = Flask(__name__)
+
+def _get_non_gemini_suggestions(conn):
+    """Generates a list of BUY/SELL/HOLD signals from the SMA strategy."""
+    symbols = get_symbols(conn, cfg.exchange, quote=cfg.default_quote)
+    suggestions = []
+    strategy = SMACrossoverStrategy(fast=10, slow=30) # Using paper trading defaults
+
+    for symbol in symbols[:20]: # Limit to top 20 symbols for performance
+        df = get_candles_df(conn, cfg.exchange, symbol, "1h")
+        if df.empty or len(df) < 32:
+            continue
+        
+        sig = strategy.generate_signals(df)
+        last_sig = int(sig.iloc[-1]) if len(sig) else 0
+        
+        if last_sig == 1:
+            suggestions.append({"symbol": symbol, "signal": "BUY"})
+        elif last_sig == 0:
+            # Optionally show sell signals if you have an open position
+            # For now, we'll just show BUY or HOLD
+            pass
+
+    return suggestions
 
 def _compute_summary():
     conn = get_conn(cfg.database_url)
@@ -48,48 +73,4 @@ def _compute_summary():
     realized_rows = [
         dict(symbol=sym, realized_pnl=round(val, 2))
         for sym, val in sorted(realized.items(), key=lambda kv: kv[1], reverse=True)
-    ] if realized else []
-
-    position_rows = []
-    for sym, qty in positions.items():
-        if abs(qty) < 1e-12:
-            continue
-        lp = last_prices.get(sym)
-        position_rows.append(dict(symbol=sym, qty=qty, last_price=lp, value=round(qty * (lp or 0), 2)))
-    position_rows = sorted(position_rows, key=lambda r: r["value"], reverse=True)
-
-    recent_trades = []
-    if not trades.empty:
-        t = trades.copy().sort_values("ts", ascending=False).head(50)
-        for _, r in t.iterrows():
-            recent_trades.append(dict(
-                ts=str(r["ts"]),
-                symbol=r["symbol"],
-                side=r["side"],
-                qty=float(r["qty"]),
-                price=float(r["price"]),
-                note=str(r.get("note") or ""),
-            ))
-
-    return dict(
-        cash=round(cash, 2),
-        equity=round(equity, 2),
-        total_realized=round(total_realized, 2),
-        total_mtm=round(total_mtm, 2),
-        realized_rows=realized_rows,
-        position_rows=position_rows,
-        recent_trades=recent_trades
-    )
-
-@app.route("/")
-def dashboard():
-    data = _compute_summary()
-    return render_template("dashboard.html", **data)
-
-@app.route("/trades")
-def trades():
-    data = _compute_summary()
-    return render_template("trades.html", **data)
-
-def create_app():
-    return app
+    ] if realized else
