@@ -1,5 +1,3 @@
-import subprocess
-import sys
 from .config import cfg
 from .db import get_conn, save_backtest_result
 from .backtest import run_backtest
@@ -11,16 +9,17 @@ def run_backtest_for_symbol(symbol: str, timeframe: str = "1h", strategy: str = 
     print(f"Starting backtest for {symbol} on {timeframe} with {strategy} strategy...")
     conn = get_conn(cfg.database_url)
     
-    # Correctly call the backtest function for a single symbol
+    # Run the backtest for only the specified symbol
     _, summary_df = run_backtest(
         database_url=cfg.database_url,
         timeframe=timeframe,
         strategy_name=strategy,
-        symbol_override=symbol # This is the key change
+        symbol_override=symbol # This ensures we only test one coin
     )
     
+    # Save the results to the database
     if not summary_df.empty:
         save_backtest_result(conn, symbol, strategy, summary_df)
-        print(f"Saved backtest result for {symbol} with {strategy} strategy.")
+        print(f"SUCCESS: Saved backtest result for {symbol} with {strategy} strategy.")
     else:
-        print(f"Could not generate backtest result for {symbol}.")
+        print(f"INFO: Could not generate a backtest result for {symbol}. It may not have enough data.")
