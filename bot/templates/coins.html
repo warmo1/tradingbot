@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>All Coins - Crypto Bot</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
+    .nav { margin-bottom: 1rem; }
+    .nav a { margin-right: 1rem; text-decoration: none; color: #0366d6; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 0.5rem; text-align: left; }
+    th { background: #fafafa; }
+    .action-btn { background-color: #4285F4; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/">Dashboard</a>
+    <a href="/coins">All Coins</a>
+    <a href="/trades">Trades</a>
+  </div>
+  <h1>All Coins in Database</h1>
+  <p>Trigger actions for any coin with USDT as the quote currency.</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Symbol</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for symbol in symbols %}
+      <tr>
+        <td>{{ symbol }}</td>
+        <td>
+          <button class="action-btn" onclick="runAction('/api/run-backtest', '{{ symbol }}')">Run Backtest</button>
+          </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <script>
+    function runAction(endpoint, symbol) {
+      const formData = new FormData();
+      formData.append('symbol', symbol);
+
+      fetch(endpoint, {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        alert(data.message);
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('An error occurred.');
+      });
+    }
+  </script>
+</body>
+</html>
