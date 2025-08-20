@@ -1,6 +1,7 @@
 import sqlite3
 import os
 from typing import Iterable, Tuple, List, Optional
+import json
 
 def db_path_from_url(url: str) -> str:
     if not url.startswith("sqlite:///"):
@@ -11,6 +12,7 @@ def get_conn(database_url: str) -> sqlite3.Connection:
     path = db_path_from_url(database_url)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     conn = sqlite3.connect(path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row # Allows accessing columns by name
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     return conn
@@ -41,7 +43,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
             volume REAL NOT NULL,
             UNIQUE(exchange, symbol, timeframe, ts)
         );
-        CREATE INDEX IF NOT EXISTS idx_candles_symbol_time ON candles(symbol, timeframe, ts);
         CREATE TABLE IF NOT EXISTS paper_state (
             key TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -56,36 +57,47 @@ def init_schema(conn: sqlite3.Connection) -> None:
             fee REAL NOT NULL DEFAULT 0,
             note TEXT
         );
-        -- Updated insights table for structured data
         CREATE TABLE IF NOT EXISTS insights (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts INTEGER NOT NULL,
-            symbol TEXT NOT NULL UNIQUE, -- Store one insight per symbol
-            signal TEXT NOT NULL, -- e.g., 'BUY', 'SELL', 'HOLD'
+            symbol TEXT NOT NULL UNIQUE,
+            signal TEXT NOT NULL,
             justification TEXT NOT NULL
+        );
+        -- New table for backtest results
+        CREATE TABLE IF NOT EXISTS backtest_results (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ts INTEGER NOT NULL,
+            symbol TEXT NOT NULL,
+            strategy TEXT NOT NULL,
+            results_json TEXT NOT NULL,
+            UNIQUE(symbol, strategy)
         );
         '''
     )
     conn.commit()
 
-# --- New function to upsert insights ---
-def upsert_insight(conn: sqlite3.Connection, symbol: str, signal: str, justification: str) -> None:
+# --- New function to save backtest results ---
+def save_backtest_result(conn: sqlite3.Connection, symbol: str, strategy: str, results_df):
     ts = int(__import__("time").time() * 1000)
+    results_json = results_df.to_json(orient="records")
     conn.execute(
-        """INSERT INTO insights (ts, symbol, signal, justification)
+        """INSERT INTO backtest_results (ts, symbol, strategy, results_json)
            VALUES (?, ?, ?, ?)
-           ON CONFLICT(symbol) DO UPDATE SET
-             ts=excluded.ts, signal=excluded.signal, justification=excluded.justification
+           ON CONFLICT(symbol, strategy) DO UPDATE SET
+             ts=excluded.ts, results_json=excluded.results_json
         """,
-        (ts, symbol, signal, justification),
+        (ts, symbol, strategy, results_json)
     )
     conn.commit()
 
-# --- New function to get all insights ---
-def get_all_insights(conn: sqlite3.Connection) -> List[dict]:
-    cur = conn.execute("SELECT symbol, signal, justification FROM insights ORDER BY ts DESC")
-    return [dict(row) for row in cur.fetchall()]
-
+# --- New function to get backtest results ---
+def get_backtest_results(conn: sqlite3.Connection, symbol: str):
+    cur = conn.execute("SELECT strategy, results_json FROM backtest_results WHERE symbol = ? ORDER BY ts DESC", (symbol,))
+    results = {}
+    for row in cur.fetchall():
+        results[row['strategy']] = json.loads(row['results_json'])
+    return results
 # (All other DB functions remain the same)
 def upsert_market(conn: sqlite3.Connection, row: Tuple[str, str, str, str, int]) -> None:
     conn.execute(
@@ -179,3 +191,19 @@ def get_latest_close(conn: sqlite3.Connection, exchange: str, symbol: str):
     )
     r2 = cur2.fetchone()
     return float(r2[0]) if r2 else None
+
+def upsert_insight(conn: sqlite3.Connection, symbol: str, signal: str, justification: str) -> None:
+    ts = int(__import__("time").time() * 1000)
+    conn.execute(
+        """INSERT INTO insights (ts, symbol, signal, justification)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(symbol) DO UPDATE SET
+             ts=excluded.ts, signal=excluded.signal, justification=excluded.justification
+        """,
+        (ts, symbol, signal, justification),
+    )
+    conn.commit()
+
+def get_all_insights(conn: sqlite3.Connection) -> List[dict]:
+    cur = conn.execute("SELECT symbol, signal, justification FROM insights ORDER BY ts DESC")
+    return [dict(row) for row in cur.fetchall()]
