@@ -11,18 +11,18 @@
     th, td { border-bottom: 1px solid #eee; padding: 0.5rem; text-align: left; }
     th { background: #fafafa; }
     .muted { color: #666; }
-    .profit { color: green; font-weight: 600; }
-    .loss { color: red; font-weight: 600; }
   </style>
 </head>
 <body>
   <div class="nav">
     <a href="/">Dashboard</a>
+    <a href="/portfolio">AI Portfolio</a>
+    <a href="/coins">All Coins</a>
     <a href="/trades">Trades</a>
   </div>
   <h1>Recent Trades</h1>
   <table>
-    <thead><tr><th>Time (UTC)</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>PnL</th><th>Note</th></tr></thead>
+    <thead><tr><th>Time (UTC)</th><th>Symbol</th><th>Side</th><th>Qty</th><th>Price</th><th>Note</th></tr></thead>
     <tbody>
       {% if recent_trades %}
         {% for t in recent_trades %}
@@ -32,20 +32,11 @@
           <td>{{ t.side|upper }}</td>
           <td>{{ "%.6f"|format(t.qty) }}</td>
           <td>{{ t.price }}</td>
-          <td>
-            {% if t.pnl is defined %}
-              <span class="{% if t.pnl >= 0 %}profit{% else %}loss{% endif %}">
-                {{ "%.2f"|format(t.pnl) }}
-              </span>
-            {% else %}
-              <span class="muted">-</span>
-            {% endif %}
-          </td>
           <td>{{ t.note }}</td>
         </tr>
         {% endfor %}
       {% else %}
-        <tr><td colspan="7" class="muted">No trades yet.</td></tr>
+        <tr><td colspan="6" class="muted">No trades yet.</td></tr>
       {% endif %}
     </tbody>
   </table>
