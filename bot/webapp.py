@@ -8,7 +8,6 @@ from .actions import run_backtest_for_symbol
 
 app = Flask(__name__)
 
-# (_compute_summary remains largely the same)
 def _compute_summary():
     conn = get_conn(cfg.database_url)
     trades = get_paper_trades_df(conn)
@@ -94,7 +93,6 @@ def dashboard():
     data = _compute_summary()
     return render_template("dashboard.html", **data)
     
-# --- New Portfolio Page ---
 @app.route("/portfolio")
 def portfolio_page():
     conn = get_conn(cfg.database_url)
@@ -107,27 +105,26 @@ def portfolio_page():
     
     return render_template("portfolio.html", suggestion=portfolio_suggestion)
 
-# --- New Coins and Backtesting Page ---
 @app.route("/coins")
 def coins_page():
     conn = get_conn(cfg.database_url)
     symbols = get_symbols(conn, cfg.exchange, quote=cfg.default_quote)
     return render_template("coins.html", symbols=symbols)
 
-# --- New Backtest Results Page ---
 @app.route("/backtest-results/<symbol>")
 def backtest_results_page(symbol):
+    # The replace is necessary because '/' is not allowed in URLs directly
+    symbol = symbol.replace('-', '/')
     conn = get_conn(cfg.database_url)
     results = get_backtest_results(conn, symbol)
     return render_template("backtest_results.html", symbol=symbol, results=results)
 
-# --- Fixed Trades Page ---
+# --- This route is now fixed ---
 @app.route("/trades")
 def trades():
     data = _compute_summary()
     return render_template("trades.html", **data)
 
-# --- API Endpoints ---
 @app.route("/api/run-backtest", methods=["POST"])
 def api_run_backtest():
     symbol = request.form.get("symbol")
@@ -136,7 +133,7 @@ def api_run_backtest():
         return jsonify({"status": "error", "message": "Symbol and strategy are required"}), 400
     
     run_backtest_for_symbol(symbol, strategy=strategy)
-    return jsonify({"status": "success", "message": f"Backtest for {symbol} with {strategy} strategy is complete. Refresh to see results."})
+    return jsonify({"status": "success", "message": f"Backtest for {symbol} with {strategy} strategy is complete. Refresh the results page."})
 
 @app.route("/api/start-bot", methods=["POST"])
 def start_bot():
