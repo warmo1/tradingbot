@@ -1,32 +1,11 @@
 from flask import Flask, render_template, jsonify, request, redirect, url_for
+import subprocess
+import sys
 from .config import cfg
-from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_symbols, get_candles_df, paper_trade, paper_set, get_latest_insight
-from .strategy import SMACrossoverStrategy
+from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_all_insights, paper_trade, paper_set
 from .ai_analyzer import get_ai_analyzer
 
 app = Flask(__name__)
-
-# (Keep _get_non_gemini_suggestions)
-def _get_non_gemini_suggestions(conn):
-    """Generates a list of BUY/SELL/HOLD signals from the SMA strategy."""
-    symbols = get_symbols(conn, cfg.exchange, quote=cfg.default_quote)
-    suggestions = []
-    strategy = SMACrossoverStrategy(fast=10, slow=30) # Using paper trading defaults
-
-    for symbol in symbols[:20]: # Limit to top 20 symbols for performance
-        df = get_candles_df(conn, cfg.exchange, symbol, "1h")
-        if df.empty or len(df) < 32:
-            continue
-        
-        sig = strategy.generate_signals(df)
-        last_sig = int(sig.iloc[-1]) if len(sig) else 0
-        
-        if last_sig == 1:
-            suggestions.append({"symbol": symbol, "signal": "BUY"})
-        elif last_sig == 0:
-            pass
-
-    return suggestions
 
 def _compute_summary():
     conn = get_conn(cfg.database_url)
@@ -95,10 +74,8 @@ def _compute_summary():
                 note=str(r.get("note") or ""),
             ))
     
-    suggestions = _get_non_gemini_suggestions(conn)
-    
-    # --- Read latest insight from the database ---
-    news_sentiment = get_latest_insight(conn, "news_sentiment") or "No sentiment generated yet. Run the scheduler."
+    # --- Read AI insights from the database ---
+    insights = get_all_insights(conn)
 
     return dict(
         cash=round(cash, 2),
@@ -108,65 +85,28 @@ def _compute_summary():
         realized_rows=realized_rows,
         position_rows=position_rows,
         recent_trades=recent_trades,
-        suggestions=suggestions,
-        news_sentiment=news_sentiment
+        insights=insights
     )
 
-
-# (Keep all existing routes: /, /trades, /api/gemini-suggestion, /trade/buy)
 @app.route("/")
 def dashboard():
     data = _compute_summary()
     return render_template("dashboard.html", **data)
 
-@app.route("/trades")
-def trades():
-    data = _compute_summary()
-    return render_template("trades.html", **data)
-
-@app.route("/api/gemini-suggestion")
-def gemini_suggestion():
-    symbol = request.args.get('symbol', type=str)
-    timeframe = request.args.get('timeframe', '1h', type=str)
-    if not symbol:
-        return jsonify({"error": "Symbol parameter is required."}), 400
-    
-    conn = get_conn(cfg.database_url)
-    df = get_candles_df(conn, cfg.exchange, symbol, timeframe)
-    if df.empty:
-        return jsonify({"error": f"No data found for {symbol} on {timeframe} timeframe."}), 404
-    
-    ai_analyzer = get_ai_analyzer() # Defaults to Gemini
-    suggestion = ai_analyzer.get_trade_suggestion(symbol, df)
-    return jsonify({"suggestion": suggestion})
-
-@app.route("/trade/buy", methods=["POST"])
-def buy_from_dashboard():
+# --- New endpoint to start a paper trading bot ---
+@app.route("/api/start-bot", methods=["POST"])
+def start_bot():
     symbol = request.form['symbol']
-    cash_per_trade = 100.0 # You can make this configurable
-    
-    conn = get_conn(cfg.database_url)
-    price = get_latest_close(conn, cfg.exchange, symbol)
-    if not price:
-        return "Could not get latest price.", 400
+    if not symbol:
+        return jsonify({"status": "error", "message": "Symbol is required."}), 400
 
-    cash = float(paper_get(conn, "cash", "0"))
-    if cash < cash_per_trade:
-        return "Not enough cash.", 400
-
-    qty = cash_per_trade / price
-    new_cash = cash - cash_per_trade
-    
-    pos_key = f"pos:{symbol}"
-    current_qty = float(paper_get(conn, pos_key, "0"))
-    new_qty = current_qty + qty
-
-    paper_set(conn, "cash", str(new_cash))
-    paper_set(conn, pos_key, str(new_qty))
-    paper_trade(conn, int(__import__("time").time() * 1000), symbol, "buy", qty, price, note="Dashboard BUY")
-
-    return redirect(url_for("dashboard"))
-
+    try:
+        # Use subprocess to run the 'paper' command in the background
+        command = [sys.executable, "-m", "bot.run", "paper", "--symbol", symbol]
+        subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return jsonify({"status": "success", "message": f"Started paper trading bot for {symbol}."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 def create_app():
     return app
