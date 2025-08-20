@@ -7,8 +7,8 @@ from .backtest import run_backtest
 from .paper import paper_loop
 from .exchange import get_exchange
 from .strategy import SMACrossoverStrategy, RSIStrategy
+from .scheduler import run_scheduler # Import the new scheduler
 
-# This function was missing in the previous version
 def cmd_discover(args):
     conn = get_conn(cfg.database_url)
     init_schema(conn)
@@ -19,12 +19,10 @@ def cmd_discover(args):
     if len(syms) > 50:
         print(" ...")
 
-# This function was missing
 def cmd_ingest(args):
     ingest_candles(cfg.database_url, timeframe=args.timeframe, limit=args.limit, quote=args.quote, top_by_volume=args.top)
     print("Done ingest.")
 
-# This function was missing
 def cmd_backtest(args):
     results, summary = run_backtest(
         database_url=cfg.database_url,
@@ -43,7 +41,6 @@ def cmd_backtest(args):
         return
     print(summary.to_string(index=False))
 
-# This function had the syntax error
 def cmd_paper(args):
     symbol = args.symbol
     if not symbol:
@@ -80,7 +77,6 @@ def cmd_paper(args):
         sleep_s=args.sleep
     )
 
-# This function was missing
 def cmd_live(args):
     if args.confirm != "TRADE":
         print("You must pass --confirm TRADE to enable live orders.")
@@ -97,6 +93,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Crypto Bot (Starter)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
+    # (Keep all existing parsers)
     sp = sub.add_parser("discover", help="Discover and store markets (symbols)")
     sp.add_argument("--quote", type=str, default=None, help="Filter by quote currency (e.g., USDT)")
     sp.set_defaults(func=cmd_discover)
@@ -145,6 +142,11 @@ def main(argv=None):
     sp.add_argument("--sleep", type=int, default=60)
     sp.add_argument("--confirm", type=str, default="", help="Must equal 'TRADE' to run")
     sp.set_defaults(func=cmd_live)
+    
+    # --- New Scheduler Command ---
+    sp = sub.add_parser("scheduler", help="Run the automated data and insights scheduler")
+    sp.set_defaults(func=lambda args: run_scheduler())
+
 
     args = p.parse_args(argv)
     return args.func(args)
