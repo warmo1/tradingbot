@@ -3,7 +3,6 @@ import os
 from typing import Iterable, Tuple, List, Optional
 
 def db_path_from_url(url: str) -> str:
-    # Expecting sqlite:///path.db
     if not url.startswith("sqlite:///"):
         raise ValueError("Only sqlite:/// URLs are supported in this starter.")
     return url.replace("sqlite:///", "", 1)
@@ -34,7 +33,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
             exchange TEXT NOT NULL,
             symbol TEXT NOT NULL,
             timeframe TEXT NOT NULL,
-            ts INTEGER NOT NULL, -- ms since epoch
+            ts INTEGER NOT NULL,
             open REAL NOT NULL,
             high REAL NOT NULL,
             low REAL NOT NULL,
@@ -51,24 +50,43 @@ def init_schema(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts INTEGER NOT NULL,
             symbol TEXT NOT NULL,
-            side TEXT NOT NULL, -- buy/sell
+            side TEXT NOT NULL,
             qty REAL NOT NULL,
             price REAL NOT NULL,
             fee REAL NOT NULL DEFAULT 0,
             note TEXT
         );
-        -- New table for AI insights
+        -- Updated insights table for structured data
         CREATE TABLE IF NOT EXISTS insights (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts INTEGER NOT NULL,
-            source TEXT NOT NULL, -- e.g., 'news_sentiment', 'market_analysis'
-            content TEXT NOT NULL
+            symbol TEXT NOT NULL UNIQUE, -- Store one insight per symbol
+            signal TEXT NOT NULL, -- e.g., 'BUY', 'SELL', 'HOLD'
+            justification TEXT NOT NULL
         );
         '''
     )
     conn.commit()
 
-# (Keep all other functions the same: upsert_market, bulk_insert_candles, etc.)
+# --- New function to upsert insights ---
+def upsert_insight(conn: sqlite3.Connection, symbol: str, signal: str, justification: str) -> None:
+    ts = int(__import__("time").time() * 1000)
+    conn.execute(
+        """INSERT INTO insights (ts, symbol, signal, justification)
+           VALUES (?, ?, ?, ?)
+           ON CONFLICT(symbol) DO UPDATE SET
+             ts=excluded.ts, signal=excluded.signal, justification=excluded.justification
+        """,
+        (ts, symbol, signal, justification),
+    )
+    conn.commit()
+
+# --- New function to get all insights ---
+def get_all_insights(conn: sqlite3.Connection) -> List[dict]:
+    cur = conn.execute("SELECT symbol, signal, justification FROM insights ORDER BY ts DESC")
+    return [dict(row) for row in cur.fetchall()]
+
+# (All other DB functions remain the same)
 def upsert_market(conn: sqlite3.Connection, row: Tuple[str, str, str, str, int]) -> None:
     conn.execute(
         """INSERT INTO markets (exchange, symbol, base, quote, active)
@@ -161,20 +179,3 @@ def get_latest_close(conn: sqlite3.Connection, exchange: str, symbol: str):
     )
     r2 = cur2.fetchone()
     return float(r2[0]) if r2 else None
-
-# --- New DB functions for insights ---
-def add_insight(conn: sqlite3.Connection, source: str, content: str) -> None:
-    ts = int(__import__("time").time() * 1000)
-    conn.execute(
-        "INSERT INTO insights (ts, source, content) VALUES (?, ?, ?)",
-        (ts, source, content),
-    )
-    conn.commit()
-
-def get_latest_insight(conn: sqlite3.Connection, source: str) -> Optional[str]:
-    cur = conn.execute(
-        "SELECT content FROM insights WHERE source=? ORDER BY ts DESC LIMIT 1",
-        (source,)
-    )
-    r = cur.fetchone()
-    return r[0] if r else None
