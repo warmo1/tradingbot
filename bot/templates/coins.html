@@ -43,7 +43,7 @@
           <button class="action-btn" onclick="runBacktest('{{ symbol }}', '{{ loop.index }}')">Run Backtest</button>
         </td>
         <td>
-          <a href="/backtest-results/{{ symbol|replace('/', '-') }}">View Results</a>
+          <a href="/backtest-results/{{ symbol.replace('/', '-') }}">View Results</a>
         </td>
       </tr>
       {% endfor %}
@@ -57,6 +57,11 @@
       formData.append('symbol', symbol);
       formData.append('strategy', strategy);
 
+      // Disable the button to prevent multiple clicks
+      const button = event.target;
+      button.disabled = true;
+      button.innerText = "Running...";
+
       fetch('/api/run-backtest', {
         method: 'POST',
         body: formData
@@ -64,12 +69,16 @@
       .then(response => response.json())
       .then(data => {
         alert(data.message);
-        // Optionally redirect to the results page
-        // window.location.href = `/backtest-results/${symbol.replace('/', '-')}`;
+        button.disabled = false;
+        button.innerText = "Run Backtest";
+        // Automatically refresh the results page after running
+        window.location.href = `/backtest-results/${symbol.replace('/', '-')}`;
       })
       .catch(error => {
         console.error('Error:', error);
         alert('An error occurred.');
+        button.disabled = false;
+        button.innerText = "Run Backtest";
       });
     }
   </script>
