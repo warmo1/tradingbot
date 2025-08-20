@@ -1,9 +1,9 @@
 import schedule
 import time
+import re
 from .data import ingest_candles
-from .news import get_latest_crypto_news
 from .ai_analyzer import get_ai_analyzer
-from .db import get_conn, add_insight
+from .db import get_conn, upsert_insight, get_symbols
 from .config import cfg
 
 def ingest_data_job():
@@ -12,27 +12,36 @@ def ingest_data_job():
     print("[Scheduler] Data ingestion job finished.")
 
 def generate_insights_job():
-    print("[Scheduler] Running 15-minute insights generation job...")
+    print("[Scheduler] Running insights generation job...")
     conn = get_conn(cfg.database_url)
-    headlines = get_latest_crypto_news()
+    ai = get_ai_analyzer()
     
-    if headlines:
-        ai = get_ai_analyzer()
-        sentiment = ai.get_news_sentiment(headlines)
-        add_insight(conn, "news_sentiment", sentiment)
-        print(f"[Scheduler] Saved new sentiment insight: {sentiment[:60]}...")
-    
-    print("[Scheduler] Insights generation job finished.")
+    # Get top 5 symbols to analyze
+    symbols_to_analyze = get_symbols(conn, cfg.exchange, quote=cfg.default_quote)[:5]
 
+    for symbol in symbols_to_analyze:
+        print(f"[Scheduler] Analyzing {symbol}...")
+        df = __import__("bot.db").get_candles_df(conn, cfg.exchange, symbol, "1h")
+        if df.empty:
+            continue
+            
+        suggestion = ai.get_trade_suggestion(symbol, df)
+        
+        # Extract the first word (BUY, SELL, or HOLD)
+        match = re.match(r"^\s*(\w+)", suggestion)
+        signal = match.group(1).upper() if match else "HOLD"
+        
+        upsert_insight(conn, symbol, signal, suggestion)
+        print(f"[Scheduler] Saved new insight for {symbol}: {signal}")
+
+    print("[Scheduler] Insights generation job finished.")
 
 def run_scheduler():
     print("--- Starting Automated Scheduler ---")
-    
-    # Schedule the jobs
     schedule.every().hour.do(ingest_data_job)
-    schedule.every(15).minutes.do(generate_insights_job)
+    schedule.every(30).minutes.do(generate_insights_job)
 
-    # Run the jobs once at the start
+    # Run jobs once at the start
     ingest_data_job()
     generate_insights_job()
 
