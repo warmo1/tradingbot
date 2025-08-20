@@ -2,8 +2,9 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for
 import subprocess
 import sys
 from .config import cfg
-from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_all_insights, paper_trade, paper_set
+from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_all_insights, paper_trade, paper_set, get_symbols
 from .ai_analyzer import get_ai_analyzer
+from .actions import run_backtest_for_symbol
 
 app = Flask(__name__)
 
@@ -74,7 +75,6 @@ def _compute_summary():
                 note=str(r.get("note") or ""),
             ))
     
-    # --- Read AI insights from the database ---
     insights = get_all_insights(conn)
 
     return dict(
@@ -92,25 +92,24 @@ def _compute_summary():
 def dashboard():
     data = _compute_summary()
     return render_template("dashboard.html", **data)
-@app.route("/trades")
-def trades():
-    data = _compute_summary()
-    return render_template("trades.html", **data)
+    
+# --- New Route for the Coins Page ---
+@app.route("/coins")
+def coins_page():
+    conn = get_conn(cfg.database_url)
+    symbols = get_symbols(conn, cfg.exchange, quote=cfg.default_quote)
+    return render_template("coins.html", symbols=symbols)
 
-# --- New endpoint to start a paper trading bot ---
-@app.route("/api/start-bot", methods=["POST"])
-def start_bot():
-    symbol = request.form['symbol']
+# --- New API Endpoint to Trigger a Backtest ---
+@app.route("/api/run-backtest", methods=["POST"])
+def api_run_backtest():
+    symbol = request.form.get("symbol")
     if not symbol:
-        return jsonify({"status": "error", "message": "Symbol is required."}), 400
+        return jsonify({"status": "error", "message": "Symbol is required"}), 400
+    
+    run_backtest_for_symbol(symbol)
+    return jsonify({"status": "success", "message": f"Backtest started for {symbol}. Check your terminal for results."})
 
-    try:
-        # Use subprocess to run the 'paper' command in the background
-        command = [sys.executable, "-m", "bot.run", "paper", "--symbol", symbol]
-        subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        return jsonify({"status": "success", "message": f"Started paper trading bot for {symbol}."})
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 def create_app():
     return app
