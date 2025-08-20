@@ -29,7 +29,6 @@ def run_backtest(
     symbols = get_symbols(conn, cfg.exchange, quote=quote)
     results: List[BTResult] = []
 
-    # --- Select the strategy based on the name ---
     if strategy_name == "sma_crossover":
         strategy = SMACrossoverStrategy(fast=fast, slow=slow)
     elif strategy_name == "rsi":
@@ -46,7 +45,6 @@ def run_backtest(
         changes = position_changes(sig)
         df["ret"] = df["close"].pct_change().fillna(0)
         
-        # Adjust for strategies that can short (-1 signal)
         pos = sig.shift(1).fillna(0) 
         strat_ret = pos * df["ret"]
         
@@ -64,5 +62,10 @@ def run_backtest(
     for r in results:
         rows.append(dict(symbol=r.symbol, trades=r.trades, return_pct=round(r.return_pct, 2), max_dd_pct=round(r.max_dd_pct, 2)))
     
+    # --- FIX IS HERE ---
+    # If no results were generated, return an empty DataFrame to avoid an error.
+    if not rows:
+        return results, pd.DataFrame()
+
     summary = pd.DataFrame(rows).sort_values("return_pct", ascending=False).reset_index(drop=True)
     return results, summary
