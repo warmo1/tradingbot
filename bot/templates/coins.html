@@ -11,11 +11,13 @@
     th, td { border-bottom: 1px solid #eee; padding: 0.5rem; text-align: left; }
     th { background: #fafafa; }
     .action-btn { background-color: #4285F4; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
+    select { padding: 5px; }
   </style>
 </head>
 <body>
   <div class="nav">
     <a href="/">Dashboard</a>
+    <a href="/portfolio">AI Portfolio</a>
     <a href="/coins">All Coins</a>
     <a href="/trades">Trades</a>
   </div>
@@ -26,6 +28,7 @@
       <tr>
         <th>Symbol</th>
         <th>Actions</th>
+        <th>View Results</th>
       </tr>
     </thead>
     <tbody>
@@ -33,25 +36,36 @@
       <tr>
         <td>{{ symbol }}</td>
         <td>
-          <button class="action-btn" onclick="runAction('/api/run-backtest', '{{ symbol }}')">Run Backtest</button>
-          </td>
+          <select id="strategy-{{ loop.index }}">
+            <option value="rsi">RSI Strategy</option>
+            <option value="sma_crossover">SMA Crossover</option>
+          </select>
+          <button class="action-btn" onclick="runBacktest('{{ symbol }}', '{{ loop.index }}')">Run Backtest</button>
+        </td>
+        <td>
+          <a href="/backtest-results/{{ symbol|replace('/', '-') }}">View Results</a>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 
   <script>
-    function runAction(endpoint, symbol) {
+    function runBacktest(symbol, index) {
+      const strategy = document.getElementById(`strategy-${index}`).value;
       const formData = new FormData();
       formData.append('symbol', symbol);
+      formData.append('strategy', strategy);
 
-      fetch(endpoint, {
+      fetch('/api/run-backtest', {
         method: 'POST',
         body: formData
       })
       .then(response => response.json())
       .then(data => {
         alert(data.message);
+        // Optionally redirect to the results page
+        // window.location.href = `/backtest-results/${symbol.replace('/', '-')}`;
       })
       .catch(error => {
         console.error('Error:', error);
