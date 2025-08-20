@@ -92,6 +92,10 @@ def _compute_summary():
 def dashboard():
     data = _compute_summary()
     return render_template("dashboard.html", **data)
+@app.route("/trades")
+def trades():
+    data = _compute_summary()
+    return render_template("trades.html", **data)
 
 # --- New endpoint to start a paper trading bot ---
 @app.route("/api/start-bot", methods=["POST"])
