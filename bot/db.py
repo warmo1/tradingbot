@@ -12,11 +12,26 @@ def get_conn(database_url: str) -> sqlite3.Connection:
     path = db_path_from_url(database_url)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     conn = sqlite3.connect(path, check_same_thread=False)
-    conn.row_factory = sqlite3.Row # Allows accessing columns by name
+    conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     return conn
 
+# --- New function to get only symbols with data ---
+def get_ingested_symbols(conn: sqlite3.Connection, exchange: str, quote: Optional[str]=None) -> List[str]:
+    """Gets a list of distinct symbols that have candles in the database."""
+    query = "SELECT DISTINCT symbol FROM candles WHERE exchange=?"
+    params = [exchange]
+    if quote:
+        query += " AND symbol LIKE ?"
+        params.append(f"%/{quote}")
+        
+    query += " ORDER BY symbol"
+    cur = conn.execute(query, tuple(params))
+    return [r['symbol'] for r in cur.fetchall()]
+
+
+# (All other DB functions remain the same)
 def init_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(
         '''
@@ -64,7 +79,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
             signal TEXT NOT NULL,
             justification TEXT NOT NULL
         );
-        -- New table for backtest results
         CREATE TABLE IF NOT EXISTS backtest_results (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             ts INTEGER NOT NULL,
@@ -77,7 +91,6 @@ def init_schema(conn: sqlite3.Connection) -> None:
     )
     conn.commit()
 
-# --- New function to save backtest results ---
 def save_backtest_result(conn: sqlite3.Connection, symbol: str, strategy: str, results_df):
     ts = int(__import__("time").time() * 1000)
     results_json = results_df.to_json(orient="records")
@@ -91,14 +104,13 @@ def save_backtest_result(conn: sqlite3.Connection, symbol: str, strategy: str, r
     )
     conn.commit()
 
-# --- New function to get backtest results ---
 def get_backtest_results(conn: sqlite3.Connection, symbol: str):
     cur = conn.execute("SELECT strategy, results_json FROM backtest_results WHERE symbol = ? ORDER BY ts DESC", (symbol,))
     results = {}
     for row in cur.fetchall():
         results[row['strategy']] = json.loads(row['results_json'])
     return results
-# (All other DB functions remain the same)
+
 def upsert_market(conn: sqlite3.Connection, row: Tuple[str, str, str, str, int]) -> None:
     conn.execute(
         """INSERT INTO markets (exchange, symbol, base, quote, active)
