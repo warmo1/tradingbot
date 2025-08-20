@@ -9,6 +9,7 @@ from .exchange import get_exchange
 from .strategy import SMACrossoverStrategy, RSIStrategy
 from .scheduler import run_scheduler
 
+# (All cmd_ functions remain the same)
 def cmd_discover(args):
     conn = get_conn(cfg.database_url)
     init_schema(conn)
@@ -20,7 +21,8 @@ def cmd_discover(args):
         print(" ...")
 
 def cmd_ingest(args):
-    ingest_candles(cfg.database_url, timeframe=args.timeframe, limit=args.limit, quote=args.quote, top_by_volume=args.top)
+    # This function is now also called by the web app for single symbols
+    ingest_candles(cfg.database_url, timeframe=args.timeframe, limit=args.limit, quote=args.quote, top_by_volume=args.top, symbol_override=getattr(args, 'symbol', None))
     print("Done ingest.")
 
 def cmd_backtest(args):
@@ -35,7 +37,7 @@ def cmd_backtest(args):
         rsi_overbought=args.rsi_overbought,
         quote=args.quote,
         top=args.top,
-        symbol_override=getattr(args, 'symbol', None) # Pass single symbol if provided
+        symbol_override=getattr(args, 'symbol', None)
     )
     if summary.empty:
         print("No data to backtest. Ingest candles first.")
@@ -98,18 +100,20 @@ def main(argv=None):
     sp.add_argument("--quote", type=str, default=None, help="Filter by quote currency (e.g., USDT)")
     sp.set_defaults(func=cmd_discover)
 
+    # --- Add --symbol argument to ingest command ---
     sp = sub.add_parser("ingest", help="Fetch and store historical candles")
     sp.add_argument("--timeframe", type=str, default="1h")
     sp.add_argument("--limit", type=int, default=500)
     sp.add_argument("--quote", type=str, default=None, help="Filter to symbols with this quote")
-    sp.add_argument("--top", type=int, default=None, help="Limit to top N symbols by volume (uses exchange tickers)")
+    sp.add_argument("--top", type=int, default=None, help="Limit to top N symbols by volume")
+    sp.add_argument("--symbol", type=str, default=None, help="Ingest data for a single symbol")
     sp.set_defaults(func=cmd_ingest)
 
     sp = sub.add_parser("backtest", help="Run a backtest on historical data")
     sp.add_argument("--timeframe", type=str, default="1h")
     sp.add_argument("--quote", type=str, default=None)
     sp.add_argument("--top", type=int, default=20)
-    sp.add_argument("--symbol", type=str, default=None, help="Run backtest for a single symbol") # New argument
+    sp.add_argument("--symbol", type=str, default=None, help="Run backtest for a single symbol")
     sp.add_argument("--strategy", type=str, default="sma_crossover", choices=["sma_crossover", "rsi"], help="Trading strategy to use")
     sp.add_argument("--fast", type=int, default=20)
     sp.add_argument("--slow", type=int, default=50)
