@@ -2,12 +2,13 @@ from flask import Flask, render_template, jsonify, request, redirect, url_for
 import subprocess
 import sys
 from .config import cfg
-from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_all_insights, paper_trade, paper_set, get_symbols, get_backtest_results
+from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_all_insights, paper_trade, paper_set, get_ingested_symbols, get_backtest_results
 from .ai_analyzer import get_ai_analyzer
 from .actions import run_backtest_for_symbol
 
 app = Flask(__name__)
 
+# (_compute_summary remains the same)
 def _compute_summary():
     conn = get_conn(cfg.database_url)
     trades = get_paper_trades_df(conn)
@@ -97,7 +98,7 @@ def dashboard():
 def portfolio_page():
     conn = get_conn(cfg.database_url)
     cash = float(paper_get(conn, "cash", str(cfg.paper_starting_cash)))
-    symbols = get_symbols(conn, cfg.exchange, quote=cfg.default_quote)
+    symbols = get_ingested_symbols(conn, cfg.exchange, quote=cfg.default_quote) # Use ingested symbols
     insights = get_all_insights(conn)
     
     ai = get_ai_analyzer()
@@ -108,22 +109,36 @@ def portfolio_page():
 @app.route("/coins")
 def coins_page():
     conn = get_conn(cfg.database_url)
-    symbols = get_symbols(conn, cfg.exchange, quote=cfg.default_quote)
+    # --- This is the key change ---
+    symbols = get_ingested_symbols(conn, cfg.exchange, quote=cfg.default_quote)
     return render_template("coins.html", symbols=symbols)
 
 @app.route("/backtest-results/<symbol>")
 def backtest_results_page(symbol):
-    # The replace is necessary because '/' is not allowed in URLs directly
     symbol = symbol.replace('-', '/')
     conn = get_conn(cfg.database_url)
     results = get_backtest_results(conn, symbol)
     return render_template("backtest_results.html", symbol=symbol, results=results)
 
-# --- This route is now fixed ---
 @app.route("/trades")
 def trades():
     data = _compute_summary()
     return render_template("trades.html", **data)
+
+# --- New API Endpoint to Trigger Data Ingestion ---
+@app.route("/api/ingest-data", methods=["POST"])
+def api_ingest_data():
+    symbol = request.form.get("symbol")
+    if not symbol:
+        return jsonify({"status": "error", "message": "Symbol is required"}), 400
+    
+    try:
+        command = [sys.executable, "-m", "bot.run", "ingest", "--symbol", symbol]
+        # Run and wait for the command to complete
+        subprocess.run(command, check=True)
+        return jsonify({"status": "success", "message": f"Data ingestion for {symbol} is complete."})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route("/api/run-backtest", methods=["POST"])
 def api_run_backtest():
