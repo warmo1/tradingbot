@@ -28,6 +28,7 @@ def run_backtest(
 ) -> Tuple[List[BTResult], pd.DataFrame]:
     conn = get_conn(database_url)
     
+    # If a single symbol is provided, use it. Otherwise, get a list of symbols.
     if symbol_override:
         symbols = [symbol_override]
     else:
@@ -42,7 +43,10 @@ def run_backtest(
     else:
         raise ValueError(f"Unknown strategy: {strategy_name}")
 
-    for symbol in symbols[: (top or len(symbols)) ]:
+    # Use the 'top' parameter only when fetching a list of symbols
+    symbols_to_run = symbols[: (top if not symbol_override else None) or len(symbols)]
+
+    for symbol in symbols_to_run:
         df = get_candles_df(conn, cfg.exchange, symbol, timeframe)
         if df.empty or len(df) < max(fast, slow, rsi_period) + 2:
             continue
