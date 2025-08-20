@@ -23,10 +23,16 @@ def run_backtest(
     rsi_oversold: int=30,
     rsi_overbought: int=70,
     quote: str | None = None,
-    top: int | None = 20
+    top: int | None = 20,
+    symbol_override: str | None = None
 ) -> Tuple[List[BTResult], pd.DataFrame]:
     conn = get_conn(database_url)
-    symbols = get_symbols(conn, cfg.exchange, quote=quote)
+    
+    if symbol_override:
+        symbols = [symbol_override]
+    else:
+        symbols = get_symbols(conn, cfg.exchange, quote=quote)
+    
     results: List[BTResult] = []
 
     if strategy_name == "sma_crossover":
@@ -62,8 +68,6 @@ def run_backtest(
     for r in results:
         rows.append(dict(symbol=r.symbol, trades=r.trades, return_pct=round(r.return_pct, 2), max_dd_pct=round(r.max_dd_pct, 2)))
     
-    # --- FIX IS HERE ---
-    # If no results were generated, return an empty DataFrame to avoid an error.
     if not rows:
         return results, pd.DataFrame()
 
