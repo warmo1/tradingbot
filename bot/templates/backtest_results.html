@@ -1,0 +1,51 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Backtest Results for {{ symbol }}</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
+    .nav { margin-bottom: 1rem; }
+    .nav a { margin-right: 1rem; text-decoration: none; color: #0366d6; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border-bottom: 1px solid #eee; padding: 0.5rem; text-align: left; }
+    th { background: #fafafa; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <a href="/">Dashboard</a>
+    <a href="/portfolio">AI Portfolio</a>
+    <a href="/coins">All Coins</a>
+    <a href="/trades">Trades</a>
+  </div>
+  <h1>Backtest Results for {{ symbol }}</h1>
+  
+  {% for strategy, result_list in results.items() %}
+    <h2>Strategy: {{ strategy }}</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Symbol</th>
+          <th>Trades</th>
+          <th>Return %</th>
+          <th>Max Drawdown %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for result in result_list %}
+        <tr>
+          <td>{{ result.symbol }}</td>
+          <td>{{ result.trades }}</td>
+          <td>{{ result.return_pct }}</td>
+          <td>{{ result.max_dd_pct }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No backtest results found for this symbol yet.</p>
+  {% endfor %}
+
+</body>
+</html>
