@@ -1,14 +1,12 @@
 from flask import Flask, render_template, jsonify, request, redirect, url_for
 from .config import cfg
-from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_symbols, get_candles_df, paper_trade, paper_set
+from .db import get_conn, get_paper_trades_df, list_state_prefix, get_latest_close, paper_get, get_symbols, get_candles_df, paper_trade, paper_set, get_latest_insight
 from .strategy import SMACrossoverStrategy
 from .ai_analyzer import get_ai_analyzer
-from .news import get_latest_crypto_news
-import time
 
 app = Flask(__name__)
 
-# (Keep the existing _get_non_gemini_suggestions and _compute_summary functions)
+# (Keep _get_non_gemini_suggestions)
 def _get_non_gemini_suggestions(conn):
     """Generates a list of BUY/SELL/HOLD signals from the SMA strategy."""
     symbols = get_symbols(conn, cfg.exchange, quote=cfg.default_quote)
@@ -99,10 +97,8 @@ def _compute_summary():
     
     suggestions = _get_non_gemini_suggestions(conn)
     
-    # --- New News and Insights ---
-    headlines = get_latest_crypto_news()
-    ai_analyzer = get_ai_analyzer() # Defaults to Gemini
-    news_sentiment = ai_analyzer.get_news_sentiment(headlines) if headlines else "Could not fetch news."
+    # --- Read latest insight from the database ---
+    news_sentiment = get_latest_insight(conn, "news_sentiment") or "No sentiment generated yet. Run the scheduler."
 
     return dict(
         cash=round(cash, 2),
@@ -113,17 +109,16 @@ def _compute_summary():
         position_rows=position_rows,
         recent_trades=recent_trades,
         suggestions=suggestions,
-        headlines=headlines,
         news_sentiment=news_sentiment
     )
 
 
+# (Keep all existing routes: /, /trades, /api/gemini-suggestion, /trade/buy)
 @app.route("/")
 def dashboard():
     data = _compute_summary()
     return render_template("dashboard.html", **data)
 
-# (Keep the existing /trades and /api/gemini-suggestion routes)
 @app.route("/trades")
 def trades():
     data = _compute_summary()
@@ -145,8 +140,6 @@ def gemini_suggestion():
     suggestion = ai_analyzer.get_trade_suggestion(symbol, df)
     return jsonify({"suggestion": suggestion})
 
-
-# --- New Route for Dashboard Trading ---
 @app.route("/trade/buy", methods=["POST"])
 def buy_from_dashboard():
     symbol = request.form['symbol']
@@ -170,7 +163,7 @@ def buy_from_dashboard():
 
     paper_set(conn, "cash", str(new_cash))
     paper_set(conn, pos_key, str(new_qty))
-    paper_trade(conn, int(time.time() * 1000), symbol, "buy", qty, price, note="Dashboard BUY")
+    paper_trade(conn, int(__import__("time").time() * 1000), symbol, "buy", qty, price, note="Dashboard BUY")
 
     return redirect(url_for("dashboard"))
 
