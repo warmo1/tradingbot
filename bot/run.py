@@ -7,7 +7,7 @@ from .backtest import run_backtest
 from .paper import paper_loop
 from .exchange import get_exchange
 from .strategy import SMACrossoverStrategy, RSIStrategy
-from .scheduler import run_scheduler # Import the new scheduler
+from .scheduler import run_scheduler
 
 def cmd_discover(args):
     conn = get_conn(cfg.database_url)
@@ -34,7 +34,8 @@ def cmd_backtest(args):
         rsi_oversold=args.rsi_oversold,
         rsi_overbought=args.rsi_overbought,
         quote=args.quote,
-        top=args.top
+        top=args.top,
+        symbol_override=getattr(args, 'symbol', None) # Pass single symbol if provided
     )
     if summary.empty:
         print("No data to backtest. Ingest candles first.")
@@ -93,7 +94,6 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Crypto Bot (Starter)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    # (Keep all existing parsers)
     sp = sub.add_parser("discover", help="Discover and store markets (symbols)")
     sp.add_argument("--quote", type=str, default=None, help="Filter by quote currency (e.g., USDT)")
     sp.set_defaults(func=cmd_discover)
@@ -109,6 +109,7 @@ def main(argv=None):
     sp.add_argument("--timeframe", type=str, default="1h")
     sp.add_argument("--quote", type=str, default=None)
     sp.add_argument("--top", type=int, default=20)
+    sp.add_argument("--symbol", type=str, default=None, help="Run backtest for a single symbol") # New argument
     sp.add_argument("--strategy", type=str, default="sma_crossover", choices=["sma_crossover", "rsi"], help="Trading strategy to use")
     sp.add_argument("--fast", type=int, default=20)
     sp.add_argument("--slow", type=int, default=50)
@@ -143,7 +144,6 @@ def main(argv=None):
     sp.add_argument("--confirm", type=str, default="", help="Must equal 'TRADE' to run")
     sp.set_defaults(func=cmd_live)
     
-    # --- New Scheduler Command ---
     sp = sub.add_parser("scheduler", help="Run the automated data and insights scheduler")
     sp.set_defaults(func=lambda args: run_scheduler())
 
