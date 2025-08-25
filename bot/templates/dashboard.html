@@ -57,8 +57,13 @@
       const response = await fetch(`/api/ohlcv?symbol=${encodeURIComponent(sym)}&timeframe=${encodeURIComponent(tf)}&limit=500`);
       const data = await response.json();
       
-      candleSeries.setData(data.rows);
-      chart.timeScale().fitContent();
+      if (data.rows && data.rows.length > 0) {
+        candleSeries.setData(data.rows);
+        chart.timeScale().fitContent();
+      } else {
+        console.log("No data received for the chart.");
+        candleSeries.setData([]); // Clear the chart if no data
+      }
     }
 
     document.getElementById('reload').addEventListener('click', loadChart);
@@ -76,11 +81,12 @@
         if (response.ok) {
             statusDiv.innerText = `Trade submitted successfully at ${new Date().toLocaleTimeString()}.`;
         } else {
-            statusDiv.innerText = `Error: ${await response.text()}`;
+            const errorText = await response.text();
+            statusDiv.innerText = `Error: ${errorText}`;
         }
     });
 
-    // Load the initial chart
+    // Load the initial chart when the page loads
     loadChart();
   </script>
 </body>
