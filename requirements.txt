@@ -9,3 +9,5 @@ schedule>=1.1.0
 ccxt>=4.3.82
 uphold-python3==0.0.1
 plotly>=5.15.0
+binance-connector>=3.6
+requests>=2.31
