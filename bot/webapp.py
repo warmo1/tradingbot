@@ -11,6 +11,7 @@ app = Flask(__name__)
 def _get_conn():
     from .db import get_conn
     c = get_conn(cfg.database_url)
+    c.row_factory = sqlite3.Row
     return c
 
 @app.route("/")
@@ -28,13 +29,13 @@ def api_ohlcv():
       open REAL, high REAL, low REAL, close REAL, volume REAL,
       PRIMARY KEY(exchange,symbol,timeframe,ts)
     )""")
-    rows = conn.execute("""SELECT ts, open, high, low, close, volume
+    rows = conn.execute("""SELECT ts, open, high, low, close
                            FROM candles
                            WHERE exchange=? AND symbol=? AND timeframe=?
                            ORDER BY ts DESC LIMIT ?""",
                         ("binance", symbol, tf, limit)).fetchall()
-    rows = rows[::-1] # Reverse to have ascending time for the chart
-    data = [{"time": r[0] / 1000, "open": r[1], "high": r[2], "low": r[3], "close": r[4]} for r in rows]
+    rows = rows[::-1]
+    data = [{"time": r['ts'] / 1000, "open": r['open'], "high": r['high'], "low": r['low'], "close": r['close']} for r in rows]
     return jsonify({"symbol": symbol, "timeframe": tf, "rows": data})
 
 @app.route("/uphold_trade", methods=["POST"])
@@ -49,8 +50,6 @@ def uphold_trade():
     side = request.form.get("side", "buy")
     amount = float(request.form.get("amount", "10"))
     
-    # For a 'buy' (e.g., BTC/USDT), from_cur is USDT, to_cur is BTC
-    # For a 'sell', the logic would need to be reversed, but we'll keep it simple for now
     from_cur, to_cur = uphold_pair(symbol)
     
     try:
@@ -59,7 +58,6 @@ def uphold_trade():
     except Exception as e:
         note = f"uphold-sandbox error: {e}"
     
-    # Log the trade attempt to the local database
     conn = _get_conn()
     conn.execute("""CREATE TABLE IF NOT EXISTS paper_trades(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -69,7 +67,7 @@ def uphold_trade():
     conn.execute("INSERT INTO paper_trades(ts,symbol,side,qty,price,note) VALUES (?,?,?,?,?,?)",
                  (int(time.time()*1000), symbol, side, amount, None, note))
     conn.commit()
-    return ("", 204) # 204 No Content is a standard response for successful form posts
+    return ("", 204)
 
 def create_app():
     return app
