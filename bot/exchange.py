@@ -1,6 +1,6 @@
 import ccxt
 # --- This is the corrected import statement ---
-from uphold.uphold import Uphold
+from uphold_python import Uphold 
 from .config import cfg
 
 def get_data_exchange() -> ccxt.Exchange:
