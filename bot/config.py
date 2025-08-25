@@ -6,16 +6,17 @@ load_dotenv()
 
 @dataclass
 class Config:
-    exchange: str = os.getenv("EXCHANGE", "uphold")
-    api_key: str = os.getenv("API_KEY", "")
-    api_secret: str = os.getenv("API_SECRET", "")
-    # --- New Uphold Sandbox Keys ---
-    sandbox_api_key: str = os.getenv("SANDBOX_API_KEY", "")
-    sandbox_api_secret: str = os.getenv("SANDBOX_API_SECRET", "")
+    # --- Trading Exchange Configuration ---
+    trading_exchange: str = "uphold"
+    api_key: str = os.getenv("UPHOLD_API_KEY", "")
+    api_secret: str = os.getenv("UPHOLD_API_SECRET", "")
+    # Note: Uphold SDK uses Personal Access Tokens. These are treated as username/password.
+    
+    # --- Data Source Configuration ---
+    data_source_exchange: str = "binance"
     
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///crypto_bot.db")
-    default_quote: str = os.getenv("DEFAULT_QUOTE", "USD") # Uphold uses USD, not USDT
+    default_quote: str = os.getenv("DEFAULT_QUOTE", "USDT") # For data fetching
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
 
 cfg = Config()
