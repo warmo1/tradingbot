@@ -18,5 +18,6 @@ def get_exchange(sandbox_mode: bool = False) -> Any:
         
     return ex
 
-# (Other functions like fetch_ohlcv, etc., can be removed if not used elsewhere,
-# but it's safe to leave them for now.)
+def load_markets(ex=None):
+    ex = ex or get_exchange()
+    return ex.load_markets()
