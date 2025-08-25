@@ -9,12 +9,10 @@ def get_data_exchange() -> ccxt.Exchange:
     exchange.enableRateLimit = True
     return exchange
 
-def get_trading_exchange() -> Uphold:
+def get_trading_exchange(sandbox: bool = True) -> Uphold:
     """Returns an authenticated Uphold SDK client."""
-    # The Uphold SDK uses Personal Access Tokens as the username/password for basic auth.
-    if not cfg.api_key or not cfg.api_secret:
+    if not cfg.uphold_api_key or not cfg.uphold_api_secret:
         raise ValueError("UPHOLD_API_KEY and UPHOLD_API_SECRET must be set in your .env file.")
     
-    # The SDK is basic, we may need to handle sandbox logic manually if required.
-    # For now, we assume keys directly control live vs sandbox.
-    return Uphold(cfg.api_key, cfg.api_secret)
+    # The SDK takes a fourth argument for sandbox mode.
+    return Uphold(cfg.uphold_api_key, cfg.uphold_api_secret, sandbox)
