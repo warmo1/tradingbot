@@ -2,27 +2,86 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Crypto Bot Dashboard</title>
+  <title>Trading Bot Dashboard</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
-    .nav { margin-bottom: 1rem; }
-    .nav a { margin-right: 1rem; text-decoration: none; color: #0366d6; }
+    h1, h2, h3 { margin-bottom: 0.25rem; }
+    .controls { display:flex; gap:1rem; align-items:center; margin-bottom: .5rem; }
   </style>
+  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
-  <div class="nav">
-    <a href="/">Dashboard</a>
-    <a href="/coins">All Coins</a>
-  </div>
-  <h1>Trading Bot Dashboard</h1>
-  <p>Welcome to your Uphold trading bot. Use the "All Coins" page to view markets, see charts, and start traders.</p>
+  <h1>Trading Dashboard</h1>
   
-  <h2>Available Markets</h2>
-  <ul>
-    {% for symbol in symbols[:10] %}
-      <li>{{ symbol }}</li>
-    {% endfor %}
-    ... and {{ symbols|length - 10 }} more.
-  </ul>
+  <h2>Price Chart</h2>
+  <div class="controls">
+    <label>Symbol
+      <select id="sym">
+        <option>BTC/USDT</option>
+        <option>ETH/USDT</option>
+      </select>
+    </label>
+    <label>Timeframe
+      <select id="tf">
+        <option>1m</option>
+        <option>15m</option>
+        <option selected>1h</option>
+        <option>4h</option>
+        <option>1d</option>
+      </select>
+    </label>
+    <button id="reload">Reload Chart</button>
+  </div>
+  <div id="priceChart" style="width: 100%; height: 350px;"></div>
+
+  <h3>Uphold (Sandbox) Trade</h3>
+  <form id="upholdForm" style="display:flex; gap:.5rem; align-items:center; margin:.75rem 0;">
+    <input name="symbol" id="trade_symbol" value="BTC/USDT" style="width:8rem" readonly />
+    <select name="side"><option value="buy">BUY</option></select>
+    <input name="amount" type="number" step="0.01" min="1" value="10" style="width:8rem" />
+    <input name="token" type="password" placeholder="admin token (optional)" style="width:10rem" />
+    <button type="submit">Execute (Sandbox)</button>
+  </form>
+  <div id="tradeStatus"></div>
+
+  <script>
+    const chartElement = document.getElementById('priceChart');
+    const chart = LightweightCharts.createChart(chartElement, { width: chartElement.clientWidth, height: 350 });
+    const candleSeries = chart.addCandlestickSeries();
+
+    async function loadChart() {
+      const sym = document.getElementById('sym').value;
+      const tf = document.getElementById('tf').value;
+      document.getElementById('trade_symbol').value = sym;
+      
+      const response = await fetch(`/api/ohlcv?symbol=${encodeURIComponent(sym)}&timeframe=${encodeURIComponent(tf)}&limit=500`);
+      const data = await response.json();
+      
+      candleSeries.setData(data.rows);
+      chart.timeScale().fitContent();
+    }
+
+    document.getElementById('reload').addEventListener('click', loadChart);
+    document.getElementById('sym').addEventListener('change', loadChart);
+    document.getElementById('tf').addEventListener('change', loadChart);
+    
+    document.getElementById('upholdForm').addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const statusDiv = document.getElementById('tradeStatus');
+        statusDiv.innerText = "Submitting trade...";
+        
+        const formData = new FormData(this);
+        const response = await fetch('/uphold_trade', { method: 'POST', body: formData });
+        
+        if (response.ok) {
+            statusDiv.innerText = `Trade submitted successfully at ${new Date().toLocaleTimeString()}.`;
+        } else {
+            statusDiv.innerText = `Error: ${await response.text()}`;
+        }
+    });
+
+    // Load the initial chart
+    loadChart();
+  </script>
 </body>
 </html>
