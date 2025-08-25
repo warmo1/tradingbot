@@ -10,11 +10,12 @@ def run_backtest_for_symbol(symbol: str, timeframe: str = "1h", strategy: str = 
     print(f"Starting backtest for {symbol} on {timeframe} with {strategy} strategy...")
     conn = get_conn(cfg.database_url)
     
+    # Correctly call the backtest function for a single symbol
     _, summary_df = run_backtest(
         database_url=cfg.database_url,
         timeframe=timeframe,
         strategy_name=strategy,
-        symbol_override=symbol,
+        symbol_override=symbol, # This is the key change
         # Provide default values for other strategy params
         fast=20, slow=50, rsi_period=14, rsi_oversold=30, rsi_overbought=70
     )
