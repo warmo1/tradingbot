@@ -10,40 +10,33 @@
     table { width: 100%; border-collapse: collapse; }
     th, td { border-bottom: 1px solid #eee; padding: 0.5rem; text-align: left; }
     th { background: #fafafa; }
-    .action-btn { background-color: #4285F4; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; }
-    select { padding: 5px; }
+    .action-btn { background-color: #4285F4; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; margin-right: 5px; }
+    .live-btn { background-color: #d93025; }
   </style>
 </head>
 <body>
   <div class="nav">
     <a href="/">Dashboard</a>
-    <a href="/portfolio">AI Portfolio</a>
     <a href="/coins">All Coins</a>
-    <a href="/trades">Trades</a>
   </div>
   <h1>All Coins in Database</h1>
-  <p>Trigger actions for any coin with USDT as the quote currency.</p>
+  <p>View charts or start a trader in sandbox or live mode.</p>
   <table>
     <thead>
       <tr>
         <th>Symbol</th>
         <th>Actions</th>
-        <th>View Results</th>
       </tr>
     </thead>
     <tbody>
       {% for symbol in symbols %}
       <tr>
-        <td>{{ symbol }}</td>
         <td>
-          <select id="strategy-{{ loop.index }}">
-            <option value="rsi">RSI Strategy</option>
-            <option value="sma_crossover">SMA Crossover</option>
-          </select>
-          <button class="action-btn" onclick="runBacktest('{{ symbol }}', '{{ loop.index }}')">Run Backtest</button>
+          <a href="/chart/{{ symbol.replace('/', '-') }}">{{ symbol }}</a>
         </td>
         <td>
-          <a href="/backtest-results/{{ symbol.replace('/', '-') }}">View Results</a>
+          <button class="action-btn" onclick="startTrader('{{ symbol }}', 'sandbox')">Start Sandbox Trader</button>
+          <button class="action-btn live-btn" onclick="startTrader('{{ symbol }}', 'live')">Start LIVE Trader</button>
         </td>
       </tr>
       {% endfor %}
@@ -51,34 +44,31 @@
   </table>
 
   <script>
-    function runBacktest(symbol, index) {
-      const strategy = document.getElementById(`strategy-${index}`).value;
+    function startTrader(symbol, mode) {
+      let confirmationText = `Are you sure you want to start a ${mode.toUpperCase()} trader for ${symbol}?`;
+      if (mode === 'live') {
+        confirmationText += "\n\nWARNING: This will use REAL MONEY.";
+      }
+
+      if (!confirm(confirmationText)) {
+        return;
+      }
+      
       const formData = new FormData();
       formData.append('symbol', symbol);
-      formData.append('strategy', strategy);
+      formData.append('mode', mode);
 
-      // Disable the button to prevent multiple clicks
-      const button = event.target;
-      button.disabled = true;
-      button.innerText = "Running...";
-
-      fetch('/api/run-backtest', {
+      fetch('/api/start-trader', {
         method: 'POST',
         body: formData
       })
       .then(response => response.json())
       .then(data => {
         alert(data.message);
-        button.disabled = false;
-        button.innerText = "Run Backtest";
-        // Automatically refresh the results page after running
-        window.location.href = `/backtest-results/${symbol.replace('/', '-')}`;
       })
       .catch(error => {
-        console.error('Error:', error);
+        console.error('Error starting trader:', error);
         alert('An error occurred.');
-        button.disabled = false;
-        button.innerText = "Run Backtest";
       });
     }
   </script>
