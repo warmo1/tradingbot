@@ -8,9 +8,8 @@ load_dotenv()
 class Config:
     # --- Trading Exchange Configuration ---
     trading_exchange: str = "uphold"
-    api_key: str = os.getenv("UPHOLD_API_KEY", "")
-    api_secret: str = os.getenv("UPHOLD_API_SECRET", "")
-    # Note: Uphold SDK uses Personal Access Tokens. These are treated as username/password.
+    uphold_api_key: str = os.getenv("UPHOLD_API_KEY", "")
+    uphold_api_secret: str = os.getenv("UPHOLD_API_SECRET", "")
     
     # --- Data Source Configuration ---
     data_source_exchange: str = "binance"
