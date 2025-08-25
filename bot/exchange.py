@@ -1,33 +1,39 @@
-import ccxt
-from typing import Any, Optional
+from uphold import Uphold
 from .config import cfg
 
-def get_exchange(sandbox_mode: bool = False) -> Any:
-    klass = getattr(ccxt, cfg.exchange)
+def get_exchange(sandbox_mode: bool = False) -> Uphold:
+    """
+    Initializes and returns an authenticated Uphold API client.
+    """
+    # The Uphold SDK uses environment variables for keys, but we can pass them directly
+    # Note: The official SDK is simple and doesn't have a formal sandbox mode toggle.
+    # You must use separate sandbox keys in your .env file to test.
     
-    params = {
-        'apiKey': cfg.sandbox_api_key if sandbox_mode else cfg.api_key,
-        'secret': cfg.sandbox_api_secret if sandbox_mode else cfg.api_secret,
-    }
+    api_key = cfg.sandbox_api_key if sandbox_mode else cfg.api_key
+    api_secret = cfg.sandbox_api_secret if sandbox_mode else cfg.api_secret
     
-    ex = klass(params)
-    ex.enableRateLimit = True
+    # This is a simplified way to use the SDK. In production, you'd use OAuth.
+    # For this bot, we'll assume Personal Access Tokens are being used.
+    # The SDK is not fully featured, so we'll have to make some direct requests.
     
-    if sandbox_mode:
-        if hasattr(ex, 'set_sandbox_mode'):
-            ex.set_sandbox_mode(True)
-        else:
-            # Handle exchanges that don't have a formal sandbox mode in ccxt
-            # This might involve changing API URLs, which can be added here if needed
-            print(f"Warning: {cfg.exchange} does not have a formal sandbox mode in this library.")
+    return Uphold(api_key, api_secret)
 
-    return ex
 
-def load_markets(ex=None):
-    ex = ex or get_exchange()
-    return ex.load_markets()
+def get_uphold_assets(ex: Uphold):
+    """
+    Gets a list of all available assets on Uphold.
+    """
+    # The SDK doesn't have a direct method for this, so we make a request.
+    return ex.get_assets()
 
-# --- This function is now re-added ---
-def fetch_ohlcv(symbol: str, timeframe: str = "1h", since: Optional[int]=None, limit: int=500, ex=None):
-    ex = ex or get_exchange()
-    return ex.fetch_ohlcv(symbol, timeframe=timeframe, since=since, limit=limit)
+
+def get_uphold_ohlcv(symbol: str, timeframe: str = 'day'):
+    """
+    Gets OHLCV data. Uphold's API is limited and doesn't provide this directly.
+    This is a placeholder for where you would connect to a third-party data provider
+    or use a different method if Uphold's API supported it.
+    
+    For now, we will return an empty list to prevent crashes.
+    """
+    print(f"WARNING: Uphold's API does not provide historical OHLCV data. Ingest will not work.")
+    return []
