@@ -3,7 +3,6 @@ import time
 import re
 from .data import ingest_candles
 from .ai_analyzer import get_ai_analyzer
-# Correct way to import from other files in the 'bot' package
 from .db import get_conn, upsert_insight, get_symbols, get_candles_df
 from .config import cfg
 from .exchange import get_exchange
@@ -32,14 +31,12 @@ def generate_insights_job():
 
     for symbol in symbols_to_analyze:
         print(f"[Scheduler] Analyzing {symbol}...")
-        # This line is now fixed
         df = get_candles_df(conn, cfg.exchange, symbol, "1h")
         if df.empty:
             continue
             
         suggestion = ai.get_trade_suggestion(symbol, df)
         
-        # Extract the first word (BUY, SELL, or HOLD)
         match = re.match(r"^\s*(\w+)", suggestion)
         signal = match.group(1).upper() if match else "HOLD"
         
@@ -53,7 +50,6 @@ def run_scheduler():
     schedule.every().hour.do(ingest_data_job)
     schedule.every(30).minutes.do(generate_insights_job)
 
-    # Run jobs once at the start
     ingest_data_job()
     generate_insights_job()
 
